@@ -1,0 +1,20 @@
+<title>DFaaS</title>
+
+<script src="codeflask.min.js"></script>
+
+<style>
+body { font-family: Arial; }
+.test { background: #eee; }
+</style>
+
+<div class="test"></div>
+
+<script type='text/javascript'>
+const flask = new CodeFlask('.test', {
+  language: 'js',
+  lineNumbers: true,
+  handleTabs: true
+});
+
+window['flask'] = flask;
+</script>
