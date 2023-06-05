@@ -4,17 +4,109 @@
 
 <style>
 body { font-family: Arial; }
-.test { background: #eee; }
+#function_code {
+    background: #eee;
+    margin-left: 150px;
+}
+.function_list_container {
+    font-family: monospace;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100px;
+}
+.function_list_container #new_function {
+    padding: 10px 10px 10px 75px;
+}
+.function_list_container #new_function:hover {
+    content: 'ⓧ';
+}
+#function_list {
+    list-style: none;
+    padding: 0;
+}
+#function_list li {
+    padding: 5px 10px;
+    margin: 0;
+    width: 150px;
+}
+#function_list li:hover {
+    background: #eeddee33;
+    cursor: pointer;
+}
+#function_list li.active {
+    background: #eeccee44;
+}
 </style>
 
-<div class="test"></div>
+
+<div id="function_code"></div>
+
+<div class="function_list_container">
+  <div id="new_function">+</div>
+  <ul id="function_list">
+  </ul>
+</div>
+
 
 <script type='text/javascript'>
-const flask = new CodeFlask('.test', {
+const flask = new CodeFlask('#function_code', {
   language: 'js',
   lineNumbers: true,
   handleTabs: true
 });
 
 window['flask'] = flask;
+
+let fname = "write_test_topic"
+
+function get(url, fn) {
+    var x = new XMLHttpRequest();
+    x.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            fn(JSON.parse(x.responseText))
+        }
+    }
+    x.open('GET', url, true);
+    x.send();
+}
+function post(url, json, fn) {
+    var x = new XMLHttpRequest();
+    x.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            fn(JSON.stringify(x.responseText))
+        }
+    }
+    x.open('POST', url, true);
+    x.setRequestHeader('Content-Type', 'application/json');
+    x.send(JSON.stringify(json));
+}
+
+get('/read/' + fname, function(j) {
+    flask.updateCode(j.code);
+})
+
+function population_function_list(names, chosen) {
+    let ul = document.getElementById('function_list');
+    let html = '';
+    for (var name of names) {
+        html += '<li ' + (name == chosen ? 'class="active" ' : '') + '>' + name + '</li>';
+    }
+    ul.innerHTML = html;
+}
+
+setInterval(function() {
+    get('/function_list', function(names) {
+        population_function_list(names, fname)
+    })
+}, 2000)
+
+document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        post('/write/' + fname, {'code':flask.getCode()}, function() {
+            
+        })
+    }
+});
 </script>
