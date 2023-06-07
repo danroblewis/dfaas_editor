@@ -1,0 +1,23 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: dfaas-webide
+  labels:
+    app: dfaas-webide
+spec:
+  ports:
+    - name: webide-port
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+      nodePort: 32330
+  selector:
+    app: dfaas-webide
+  type: LoadBalancer
+  sessionAffinity: None
+  externalTrafficPolicy: Cluster
+  allocateLoadBalancerNodePorts: true
+  internalTrafficPolicy: Cluster
+status:
+  loadBalancer: {}
+

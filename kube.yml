@@ -1,0 +1,54 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+    labels:
+        app: dfaas-webide
+    name: dfaas-webide
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: dfaas-webide
+    template:
+        metadata:
+            labels:
+                app: dfaas-webide
+        spec:
+            containers:
+            - image: danroblewis/dfaas-webide:latest
+              imagePullPolicy: Always
+              name: dfaas-webide
+            env:
+            - name: MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: my-mongodb
+                  key: mongodb-root-password
+            - name: FUNCTION_NAME
+              value: "write_test_topic"
+            - name: MONGODB_HOST
+              value: "my-mongodb.default.svc.cluster.local"
+            - name: MONGODB_PORT
+              value: "27017"
+            - name: MONGODB_USER
+              value: "root"
+---
+apiVersion: v1
+kind: Service
+metadata:
+    labels:
+        app: dfaas-webide
+    name: dfaas-webide-svc
+spec:
+    ports:
+    - port: 3000
+      protocol: TCP
+      targetPort: 3000
+      nodePort: 32330
+    selector:
+        app: dfaas-webide
+    type: LoadBalancer
+  internalTrafficPolicy: Cluster
+status:
+  loadBalancer: {}
