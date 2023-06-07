@@ -37,6 +37,16 @@ body { font-family: Arial; }
 #function_list li.active {
     background: #eeccee44;
 }
+#new_function {
+    cursor: pointer;
+}
+#delete_function {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    margin: 15px 75px;
+    cursor: pointer;
+}
 </style>
 
 
@@ -44,8 +54,8 @@ body { font-family: Arial; }
 
 <div class="function_list_container">
   <div id="new_function">+</div>
-  <ul id="function_list">
-  </ul>
+  <ul id="function_list"></ul>
+  <div id="delete_function">🗑️</div>
 </div>
 
 
@@ -58,7 +68,7 @@ const flask = new CodeFlask('#function_code', {
 
 window['flask'] = flask;
 
-let fname = "write_test_topic"
+window.fname = "write_test_topic"
 
 function get(url, fn) {
     var x = new XMLHttpRequest();
@@ -82,31 +92,55 @@ function post(url, json, fn) {
     x.send(JSON.stringify(json));
 }
 
-get('/read/' + fname, function(j) {
-    flask.updateCode(j.code);
-})
-
-function population_function_list(names, chosen) {
-    let ul = document.getElementById('function_list');
-    let html = '';
-    for (var name of names) {
-        html += '<li ' + (name == chosen ? 'class="active" ' : '') + '>' + name + '</li>';
-    }
-    ul.innerHTML = html;
+function open_file(_fname) {
+    window.fname = _fname;
+    console.log(window.fname)
+    get('/read/' + _fname, function(j) {
+        flask.updateCode(j.code);
+    })
 }
 
-setInterval(function() {
+function populate_function_list() {
     get('/function_list', function(names) {
-        population_function_list(names, fname)
+        let ul = document.getElementById('function_list');
+        let html = '';
+        for (var name of names) {
+            html += '<li ' + (name == window.fname ? 'class="active" ' : '') + '>' + name + '</li>';
+        }
+        ul.innerHTML = html;
+        for (var li of ul.getElementsByTagName('li')) {
+            li.onclick = (function(_fname) {
+                return function() { open_file(_fname); populate_function_list(); }
+            })(li.innerText)
+        }
     })
-}, 2000)
+}
+
+function intervolate(fn, ms) { var i=setInterval(fn, ms); fn(); console.log(i); return i;}
+
+intervolate(populate_function_list, 2000)
+
+document.getElementById('new_function').onclick = function() {
+    var new_fname = prompt("choose a dang filename")
+    window.fname = new_fname
+    post('/create/' + window.fname, function() {})
+    populate_function_list()
+}
+
+document.getElementById('delete_function').onclick = function() {
+    var fname = prompt("!!! give the function name you want to delete !!!")
+    if (window.fname == fname) {
+        window.fname = ''
+    }
+    open_file(window.fname)
+    post('/delete/' + fname, function() {})
+    populate_function_list()
+}
 
 document.addEventListener('keydown', e => {
     if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
-        post('/write/' + fname, {'code':flask.getCode()}, function() {
-            
-        })
+        post('/write/' + window.fname, {'code':flask.getCode()}, function() {})
     }
 });
 </script>

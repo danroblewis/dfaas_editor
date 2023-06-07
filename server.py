@@ -35,6 +35,16 @@ def writefn(fname):
     coll.replace_one({'name': fname}, {'name': fname, 'code': code})
     return {'success': True}
 
+@app.route('/create/<fname>', methods=['POST'])
+def createfn(fname):
+    coll.insert_one({'name': fname, 'code': ''})
+    return {'success': True}
+
+@app.route('/delete/<fname>', methods=['POST'])
+def deletefn(fname):
+    coll.delete_one({'name': fname})
+    return {'success': True}
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3001)
