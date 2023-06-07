@@ -47,6 +47,9 @@ body { font-family: Arial; }
     margin: 15px 75px;
     cursor: pointer;
 }
+textarea.codeflask__textarea.changes {
+    background: #f7fefe;
+}
 </style>
 
 
@@ -66,9 +69,19 @@ const flask = new CodeFlask('#function_code', {
   handleTabs: true
 });
 
+function setChanged() {
+    flask.elWrapper.getElementsByTagName('textarea')[0].classList.add('changes')
+}
+function setUnchanged() {
+    flask.elWrapper.getElementsByTagName('textarea')[0].classList.remove('changes')
+}
+
+flask.onUpdate(setChanged)
+
 window['flask'] = flask;
 
-window.fname = "write_test_topic"
+window.fname = ""
+window.changed = false
 
 function get(url, fn) {
     var x = new XMLHttpRequest();
@@ -84,7 +97,7 @@ function post(url, json, fn) {
     var x = new XMLHttpRequest();
     x.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-            fn(JSON.stringify(x.responseText))
+            fn && fn(JSON.stringify(x.responseText))
         }
     }
     x.open('POST', url, true);
@@ -96,7 +109,8 @@ function open_file(_fname) {
     window.fname = _fname;
     console.log(window.fname)
     get('/read/' + _fname, function(j) {
-        flask.updateCode(j.code);
+        flask.updateCode(j.code)
+        setTimeout(setUnchanged, 100)
     })
 }
 
@@ -123,7 +137,7 @@ intervolate(populate_function_list, 2000)
 document.getElementById('new_function').onclick = function() {
     var new_fname = prompt("choose a dang filename")
     window.fname = new_fname
-    post('/create/' + window.fname, function() {})
+    post('/create/' + window.fname)
     populate_function_list()
 }
 
@@ -133,14 +147,15 @@ document.getElementById('delete_function').onclick = function() {
         window.fname = ''
     }
     open_file(window.fname)
-    post('/delete/' + fname, function() {})
+    post('/delete/' + fname)
     populate_function_list()
 }
 
 document.addEventListener('keydown', e => {
     if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
-        post('/write/' + window.fname, {'code':flask.getCode()}, function() {})
+        post('/write/' + window.fname, {'code':flask.getCode()})
+        setUnchanged()
     }
 });
 </script>
