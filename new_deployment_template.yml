@@ -1,0 +1,41 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dfaas-{deployment_name}
+  labels:
+    app: dfaas-python3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dfaas-python3
+  template:
+    metadata:
+      labels:
+        app: dfaas-python3
+    spec:
+      containers:
+      - name: dfaas-python3-deployment
+        image: danroblewis/dfaas-container-python3
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: my-mongodb
+              key: mongodb-root-password
+        - name: FUNCTION_NAME
+          value: "{function_name}"
+        - name: MONGODB_HOST
+          value: "my-mongodb.default.svc.cluster.local"
+        - name: MONGODB_PORT
+          value: "27017"
+        - name: MONGODB_USER
+          value: "root"
+        - name: INPUT_TOPIC
+          value: "test2"
+        - name: KAFKA_ADDRESS
+          value: "my-kafka-0.my-kafka-headless.default.svc.cluster.local:9092"

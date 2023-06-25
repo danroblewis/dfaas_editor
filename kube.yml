@@ -1,54 +1,169 @@
 ---
-apiVersion: extensions/v1beta1
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dfaas-webide
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dfaas-webide
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: dfaas-webide # Name of the ServiceAccount
+  namespace: default
+roleRef:
+  kind: ClusterRole # This must be Role or ClusterRole
+  #name: job-robot # This must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+  name: cluster-admin
+
+---
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-    labels:
-        app: dfaas-webide
-    name: dfaas-webide
+  annotations:
+  creationTimestamp: "2023-06-05T18:41:04Z"
+  generation: 1
+  name: dfaas-webide-deployment
+  namespace: default
+  resourceVersion: "1006440"
+  uid: cb2ad1af-7f9d-4ea7-9485-92b2e8e274a3
 spec:
-    replicas: 1
-    selector:
-        matchLabels:
-            app: dfaas-webide
-    template:
-        metadata:
-            labels:
-                app: dfaas-webide
-        spec:
-            containers:
-            - image: danroblewis/dfaas-webide:latest
-              imagePullPolicy: Always
-              name: dfaas-webide
-            env:
-            - name: MONGODB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: my-mongodb
-                  key: mongodb-root-password
-            - name: FUNCTION_NAME
-              value: "write_test_topic"
-            - name: MONGODB_HOST
-              value: "my-mongodb.default.svc.cluster.local"
-            - name: MONGODB_PORT
-              value: "27017"
-            - name: MONGODB_USER
-              value: "root"
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: dfaas-webide
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: dfaas-webide
+    spec:
+      serviceAccountName: dfaas-webide
+      containers:
+      - env:
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: mongodb-root-password
+              name: my-mongodb
+        - name: FUNCTION_NAME
+          value: write_test_topic
+        - name: MONGODB_HOST
+          value: my-mongodb.default.svc.cluster.local
+        - name: MONGODB_PORT
+          value: "27017"
+        - name: MONGODB_USER
+          value: root
+        image: danroblewis/dfaas-webide:latest
+        imagePullPolicy: Always
+        name: dfaas-webide
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2023-06-05T18:41:04Z"
+    lastUpdateTime: "2023-06-05T18:41:09Z"
+    message: ReplicaSet "dfaas-webide-deployment-555749dd5b" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - lastTransitionTime: "2023-06-09T04:10:20Z"
+    lastUpdateTime: "2023-06-09T04:10:20Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
 ---
 apiVersion: v1
 kind: Service
 metadata:
-    labels:
-        app: dfaas-webide
-    name: dfaas-webide-svc
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"labels":{"app":"dfaas-webide"},"name":"dfaas-webide","namespace":"default"},"spec":{"allocateLoadBalancerNodePorts":true,"externalTrafficPolicy":"Cluster","internalTrafficPolicy":"Cluster","ports":[{"name":"webide-port","nodePort":32330,"port":3000,"protocol":"TCP","targetPort":3000}],"selector":{"app":"dfaas-webide"},"sessionAffinity":"None","type":"LoadBalancer"},"status":{"loadBalancer":{}}}
+  creationTimestamp: "2023-06-05T18:37:11Z"
+  labels:
+    app: dfaas-webide
+  name: dfaas-webide
+  namespace: default
+  resourceVersion: "728362"
+  uid: f260d2b2-21da-46f0-923c-833743b9bb99
 spec:
-    ports:
-    - port: 3000
-      protocol: TCP
-      targetPort: 3000
-      nodePort: 32330
-    selector:
-        app: dfaas-webide
-    type: LoadBalancer
+  allocateLoadBalancerNodePorts: true
+  clusterIP: 10.110.50.189
+  clusterIPs:
+  - 10.110.50.189
+  externalTrafficPolicy: Cluster
   internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: webide-port
+    nodePort: 32330
+    port: 3001
+    protocol: TCP
+    targetPort: 3001
+  selector:
+    app: dfaas-webide
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"creationTimestamp":"2023-06-05T18:37:11Z","labels":{"app":"dfaas-webide"},"name":"dfaas-webide","namespace":"default","resourceVersion":"728362","uid":"f260d2b2-21da-46f0-923c-833743b9bb99"},"spec":{"allocateLoadBalancerNodePorts":true,"clusterIP":"10.110.50.189","clusterIPs":["10.110.50.189"],"externalTrafficPolicy":"Cluster","internalTrafficPolicy":"Cluster","ipFamilies":["IPv4"],"ipFamilyPolicy":"SingleStack","ports":[{"name":"webide-port","nodePort":32330,"port":3001,"protocol":"TCP","targetPort":3001}],"selector":{"app":"dfaas-webide"},"sessionAffinity":"None","type":"LoadBalancer"},"status":{"loadBalancer":{}}}
+  creationTimestamp: "2023-06-05T18:37:11Z"
+  labels:
+    app: dfaas-webide
+  name: dfaas-webide
+  namespace: default
+  resourceVersion: "1008942"
+  uid: f260d2b2-21da-46f0-923c-833743b9bb99
+spec:
+  allocateLoadBalancerNodePorts: true
+  clusterIP: 10.110.50.189
+  clusterIPs:
+  - 10.110.50.189
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: webide-port
+    nodePort: 32330
+    port: 3001
+    protocol: TCP
+    targetPort: 3001
+  selector:
+    app: dfaas-webide
+  sessionAffinity: None
+  type: LoadBalancer
 status:
   loadBalancer: {}

@@ -8,6 +8,8 @@ RUN pip3 install requests
 RUN pip3 install kafka-python
 RUN pip3 install pymongo
 RUN pip3 install flask
+RUN pip3 install kubernetes
+RUN apk add graphviz
 
 RUN mkdir -p /home/app
 
