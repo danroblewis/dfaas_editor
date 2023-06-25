@@ -7,9 +7,11 @@ from kubernetes import client, config
 import subprocess
 import io
 import json
+from dfaal import parse_applications
 
 conn = pymongo.MongoClient(os.environ['MONGODB_HOST'], int(os.environ['MONGODB_PORT']), username=os.environ['MONGODB_USER'], password=os.environ['MONGODB_PASSWORD'])
 coll = conn.test.dfaas_functions
+processes = conn.test.dfaas_processes
 apps = conn.test.dfaas_function_applications
 
 app = Flask(__name__,
@@ -19,54 +21,68 @@ app = Flask(__name__,
 new_deployment_tpl = open('./new_deployment_template.yml').read()
 
 
-def parse_mappings_from_code(text):
-    """
-    parses format of:
+def reprocess_mappings(sample=""):
+    # get all processes from the database
+    # add sample to it, so we can use this function for testing before uploading
+    # parse the whole text
+    # process it into the database format also
+    # return database formatted records for re-upload
+    texts = [ p['code'] for p in processes.find({}) ]
+    texts.append(sample)
+    text = "\n".join(texts)
+    applications = parse_applications(text)
+    
+    mappings = {}
 
-    application = "asdf"
-
-    t_some_input->change_stuff->t_cool_output
-    t_some_input->change_stuff->t_lame_output
-    t_funny_input->change_stuff->t_better_output
-
-    ignores lines with no ->
-    starts at the first "application = "
-    topics must be prepended by "t_"
-    """
-    parts = text.split("\napplication = ")
-    if len(parts) == 1:
-        return []
-    text = parts[1]
-    lines = ("application = " + text).split("\n")
-    application_name = next(t for t in lines if t.startswith('application')).split("=")[1].strip().replace('"', '')
-    mappings = []
-    input_topic = None
-    output_topic = None
-    for line in lines:
-        if '->' not in line:
-            continue
-        parts =  [ t.strip() for t in line.split("->") ]
-        if len(parts) == 2:
-            if parts[0].startswith('t_'): # topic -> function
-                input_topic = parts[0][2:]
-                function = parts[1]
-            else: # function -> topic
-                function = parts[0]
-                output_topic = parts[1][2:]
-        else:
-            input_topic = parts[0][2:]
-            function = parts[1]
-            output_topic = parts[2][2:]
-
-        mappings.append({
-            "function_application": application_name,
-            "function_name": function,
-            "input_topic": input_topic,
-            "output_topics": { "default": output_topic }
-        })
+    for f, fn, t in applications:
+      from_name = f.name if f else "null"
+      fname = fn.name
+      to_name = t.name if t else "null"
+      if fn.name not in mappings: mappings[fname] = {}
+      fmap = mappings[fname]
+      
+      if from_name not in fmap: fmap[from_name] = []
+    
+      # find out if this function+params is in the mappings already
+      p1 = json.dumps(fn.params, sort_keys=True)
+    
+      topic_map = None
+      if from_name in fmap:
+        for i in fmap[from_name]:
+          p2 = json.dumps(i['params'], sort_keys=True)
+          if p1 == p2:
+            topic_map = i
+            break
+      if topic_map is None:
+        topic_map = { "params": fn.params, "outputs": [] }
+        fmap[from_name].append(topic_map)
+      
+      # find out if the output topic set exists already
+      output_set = { "default": to_name }
+      t1 = json.dumps(output_set, sort_keys=True)
+      found_output_set = False
+      for out in topic_map['outputs']:
+        t2 = json.dumps(out, sort_keys=True)
+        if t1 == t2:
+          found_output_set = True
+          break
+      
+      if not found_output_set: topic_map['outputs'].append({ "default": to_name })
 
     return mappings
 
+
+def update_mappings(mappings):
+    global apps
+    # delete all current mappings
+    res = apps.delete_many({})
+    print(res)
+    print(res.deleted_count)
+
+    # insert all mappings from parameter
+    for fname, applications in mappings.items():
+      res = apps.insert_one({ "fname": fname, "applications": applications })
+      print(res)
 
 
 @app.route('/')
@@ -78,12 +94,14 @@ def index():
 @app.route('/function_list')
 def function_list():
     names = [ r['name'] for r in coll.find({}) ]
+    names += [ r['name'] for r in processes.find({}) ]
     return names
 
 
 @app.route('/read/<fname>')
 def readfn(fname):
-    rec = coll.find_one({ 'name': fname })
+    c = processes if fname.startswith('process:') else coll
+    rec = c.find_one({ 'name': fname })
     return jsonify({ 'code': rec['code'] })
 
 
@@ -91,29 +109,34 @@ def readfn(fname):
 def writefn(fname):
     code = request.json['code']
     print("writing", code)
-    coll.replace_one({'name': fname}, {'name': fname, 'code': code})
-    mappings = parse_mappings_from_code(code)
-    print('mappings', json.dumps(mappings, indent=4))
-    for mapping in mappings:
-        r = apps.find_one(mapping)
-        if not r:
-            apps.insert_one(mapping)
-            print("added this one", mapping)
-        else:
-            print("this one already exists", mapping)
+    c = processes if fname.startswith('process:') else coll
+    c.replace_one({'name': fname}, {'name': fname, 'code': code})
+    if fname.startswith('process:'):
+      mappings = reprocess_mappings()
+      update_mappings(mappings)
     return {'success': True}
+
 
 @app.route('/create/<fname>', methods=['POST'])
 def createfn(fname):
-    coll.insert_one({'name': fname, 'code': ''})
-    kube_submission = yaml.safe_load(new_deployment_tpl.format(deployment_name=fname.replace("_","-"), function_name=fname))
-    config.load_incluster_config()
-    v1 = client.AppsV1Api()
-    resp = v1.create_namespaced_deployment(body=kube_submission, namespace="default")
-    return {'success': True}
+    if fname.startswith('process:'):
+      processes.insert_one({'name': fname, 'code': ''})
+      return {'success': True}
+    else:
+      coll.insert_one({'name': fname, 'code': ''})
+      kube_submission = yaml.safe_load(new_deployment_tpl.format(deployment_name=fname.replace("_","-"), function_name=fname))
+      config.load_incluster_config()
+      v1 = client.AppsV1Api()
+      resp = v1.create_namespaced_deployment(body=kube_submission, namespace="default")
+      return {'success': True}
+
 
 @app.route('/delete/<fname>', methods=['POST'])
 def deletefn(fname):
+    if fname.startswith('process:'):
+      processes.delete_one({'name': fname})
+      return {'success': True}
+
     coll.delete_one({'name': fname})
     config.load_incluster_config()
     v1 = client.AppsV1Api()
@@ -126,6 +149,7 @@ def deletefn(fname):
         )
     )
     return {'success': True}
+
 
 @app.route('/fn_map')
 def fn_map():
@@ -172,5 +196,6 @@ def fn_map():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3001)
+    app.run(host='0.0.0.0', port=3006)
+
 
