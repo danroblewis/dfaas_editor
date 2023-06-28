@@ -8,6 +8,8 @@ import subprocess
 import io
 import json
 from dfaal import parse_applications
+import kafka
+import datetime
 
 conn = pymongo.MongoClient(os.environ['MONGODB_HOST'], int(os.environ['MONGODB_PORT']), username=os.environ['MONGODB_USER'], password=os.environ['MONGODB_PASSWORD'])
 coll = conn.test.dfaas_functions
@@ -35,9 +37,9 @@ def reprocess_mappings(sample=""):
     mappings = {}
 
     for f, fn, t in applications:
-      from_name = f.name if f else "null"
+      from_name = f.name.replace(":","") if f else "null"
       fname = fn.name
-      to_name = t.name if t else "null"
+      to_name = t.name.replace(":","") if t else "null"
       if fn.name not in mappings: mappings[fname] = {}
       fmap = mappings[fname]
       
@@ -151,41 +153,85 @@ def deletefn(fname):
     return {'success': True}
 
 
+@app.route('/stdout/<fnname>')
+def stdout(fnname):
+    #return {"stdouts":[{"stdout":"asdf\n","tstamp":1687981427.897007},{"stdout":"asdf\n","tstamp":1687981427.897456},{"stdout":"asdf\n","tstamp":1687981427.897657},{"stdout":"asdf\n","tstamp":1687981427.897852},{"stdout":"asdf\n","tstamp":1687981427.898045},{"stdout":"asdf\n","tstamp":1687981432.913297},{"stdout":"asdf\n","tstamp":1687981432.913751},{"stdout":"asdf\n","tstamp":1687981432.913994},{"stdout":"asdf\n","tstamp":1687981432.91423},{"stdout":"asdf\n","tstamp":1687981432.91447},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.919217},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.919816},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.921217},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.922535},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.926271}]}
+
+    topic = fnname + '_stdout'
+    
+    consumer = kafka.KafkaConsumer(bootstrap_servers=[ os.environ['KAFKA_ADDRESS'] ])
+    
+    dtstmp = datetime.datetime.now()-datetime.timedelta(minutes=2)
+    
+    month_ago = dtstmp.timestamp()
+    topic_partition = kafka.TopicPartition(topic, 0)
+    assigned_topic = [topic_partition]
+    consumer.assign(assigned_topic)
+    
+    partitions = consumer.assignment()
+    partition_to_timestamp = {part: int(month_ago * 1000) for part in partitions}
+    end_offsets = consumer.end_offsets(list(partition_to_timestamp.keys()))
+    
+    mapping = consumer.offsets_for_times(partition_to_timestamp)
+    msgs = []
+    for partition, ts in mapping.items():
+        if not ts:
+           continue
+        end_offset = end_offsets.get(partition)
+        consumer.seek(partition, ts[0])
+        for msg in consumer:
+            value = json.loads(msg.value.decode('utf-8'))
+            msgs.append(value)
+            if msg.offset == end_offset - 1:
+                consumer.close()
+                break
+    
+    return { "stdouts": msgs }
+
+
 @app.route('/fn_map')
 def fn_map():
-    fm = apps.find({})
-    dotfile = ["digraph a {"]
+    mappings = reprocess_mappings()
 
-    graph = {}
-    topics = set()
-    functions = set()
-    for m in fm:
-        inp = m['input_topic']
-        outs = m['output_topics'].values()
-        fname = m['function_name']
-        topics.add(inp)
-        functions.add(fname)
-        if inp not in graph: 
-            graph[inp] = set()
-        graph[inp].add(fname)
-        if fname not in graph: 
-            graph[fname] = set()
-        for out in outs:
-            graph[fname].add(out)
-            topics.add(out)
-    for topic in topics:
-        if topic is None: continue
-        dotfile.append(f"\"{topic}\" [style=filled color=darkseagreen1]")
-    for fname in functions:
-        dotfile.append(f"\"{fname}\" [style=filled color=lightpink]")
-    for a,bs in graph.items():
-        for b in bs:
-            if a is None or b is None: continue
-            dotfile.append(f"\"{a}\"->\"{b}\"")
-    dotfile.append("}")
+    data = [ "digraph a {" ]
+    for fname, apps in mappings.items():
+      for from_topic, mapps in apps.items():
+        for mapp in mapps:
+          params = []
+          for k,v in mapp['params'].items():
+            if isinstance(v, str):
+              params.append(f"{k}='{v}'")
+            else:
+              params.append(f"{k}={v}")
+          params = ",".join(params)
+
+          for out in mapp['outputs']:
+            if 'default' in out:
+              to_topic = out['default']
+              for t in [from_topic, to_topic]:
+                if t == 'null':
+                  continue
+                if 'dyntopic_' in t:
+                  data.append(f"\":{t}\" [style=filled color=lightblue label=\"\" shape=point]")
+                else:
+                  data.append(f"\":{t}\" [style=filled color=lightblue]")
+                  
+              if len(params) == 0:
+                f = fname
+              else:
+                f = f"{fname}\n({params})"
+              data.append(f"\"{f}\" [style=filled color=darkseagreen1]")
+
+              if from_topic == 'null':
+                data.append(f"\"{f}\"->\":{to_topic}\"")
+              elif to_topic == 'null':
+                data.append(f"\":{from_topic}\"->\"{f}\"")
+              else:
+                data.append(f"\":{from_topic}\"->\"{f}\"->\":{to_topic}\"")
+    data.append("}")
 
     p = subprocess.Popen(['dot', '-Tsvg'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    p.stdin.write("\n".join(dotfile).encode())
+    p.stdin.write("\n".join(data).encode())
     p.stdin.flush()
     imgdata = p.communicate()[0]
 

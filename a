@@ -1,0 +1,69 @@
+Sending build context to Docker daemon  259.1kB
+Step 1/21 : FROM alpine:3.12
+ ---> 24c8ece58a1a
+Step 2/21 : ENV PYTHONUNBUFFERED=1
+ ---> Using cache
+ ---> 62f9eee14eb7
+Step 3/21 : RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && apk add bash
+ ---> Using cache
+ ---> 60345b31e6d9
+Step 4/21 : RUN python3 -m ensurepip
+ ---> Using cache
+ ---> c87752e7e986
+Step 5/21 : RUN pip3 install --no-cache --upgrade pip setuptools
+ ---> Using cache
+ ---> 0ed1194894f9
+Step 6/21 : RUN pip3 install requests
+ ---> Using cache
+ ---> 2b0a7ffeadcb
+Step 7/21 : RUN pip3 install kafka-python
+ ---> Using cache
+ ---> b9a8aa879951
+Step 8/21 : RUN pip3 install pymongo
+ ---> Using cache
+ ---> 48f8da232dfb
+Step 9/21 : RUN pip3 install flask
+ ---> Using cache
+ ---> e19b63fcdd28
+Step 10/21 : RUN pip3 install kubernetes
+ ---> Using cache
+ ---> 20998fe8714c
+Step 11/21 : RUN pip3 install parsimonious
+ ---> Using cache
+ ---> 9156b302251e
+Step 12/21 : RUN apk add graphviz
+ ---> Using cache
+ ---> dd883f352ad2
+Step 13/21 : RUN mkdir -p /home/app
+ ---> Using cache
+ ---> 4994f4676145
+Step 14/21 : RUN addgroup -S app && adduser app -S -G app
+ ---> Using cache
+ ---> 387cf2d1367c
+Step 15/21 : RUN chown app /home/app
+ ---> Using cache
+ ---> a018e41bd5e4
+Step 16/21 : COPY . /home/app
+ ---> c95be8623394
+Step 17/21 : WORKDIR /home/app
+ ---> Running in e19823227867
+Removing intermediate container e19823227867
+ ---> 1c1ddcd490a2
+Step 18/21 : USER root
+ ---> Running in 56cf1495bb98
+Removing intermediate container 56cf1495bb98
+ ---> fadee520aae6
+Step 19/21 : EXPOSE 3001
+ ---> Running in 49c27c7baefa
+Removing intermediate container 49c27c7baefa
+ ---> 8bf98b3b558f
+Step 20/21 : HEALTHCHECK --interval=3s CMD [ -e /tmp/.lock ] || exit 1
+ ---> Running in 06b239d41eed
+Removing intermediate container 06b239d41eed
+ ---> e2989b87a478
+Step 21/21 : CMD ["./run.sh"]
+ ---> Running in 5acb99476285
+Removing intermediate container 5acb99476285
+ ---> 739148cda70c
+Successfully built 739148cda70c
+Successfully tagged danroblewis/dfaas-webide:latest

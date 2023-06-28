@@ -169,6 +169,7 @@ def generateDynamicTopic(a, b):
   e.val = Topic()
   e.val.name = ':' + f"{a.val}__to__{b.val}".replace("(","").replace(")","")\
     .replace(",","_").replace("=","_").replace("->","_").replace(".","_")
+  e.val.name = ':dyntopic_' + base64.b64encode(e.val.name.encode()).decode().replace("=","")
   e.n = b
   return e
 

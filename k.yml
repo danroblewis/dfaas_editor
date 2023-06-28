@@ -1,0 +1,91 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: my-kafka-headless
+  namespace: default
+  uid: 15113f55-fadd-440d-ab62-916c5fad61d5
+  resourceVersion: '536414'
+  creationTimestamp: '2023-06-05T17:02:17Z'
+  labels:
+    app.kubernetes.io/component: kafka
+    app.kubernetes.io/instance: my-kafka
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: kafka
+    helm.sh/chart: kafka-22.1.3
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"kafka","app.kubernetes.io/instance":"my-kafka","app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/name":"kafka","helm.sh/chart":"kafka-22.1.3"},"name":"my-kafka-headless","namespace":"default"},"spec":{"clusterIP":"None","ports":[{"name":"tcp-client","port":9092,"protocol":"TCP","targetPort":"kafka-client"},{"name":"tcp-internal","port":9094,"protocol":"TCP","targetPort":"kafka-internal"},{"name":"tcp-controller","port":9093,"protocol":"TCP","targetPort":"kafka-ctlr"}],"publishNotReadyAddresses":false,"selector":{"app.kubernetes.io/component":"kafka","app.kubernetes.io/instance":"my-kafka","app.kubernetes.io/name":"kafka"},"type":"ClusterIP"}}
+  managedFields:
+    - manager: kubectl-client-side-apply
+      operation: Update
+      apiVersion: v1
+      time: '2023-06-05T17:02:17Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:kubectl.kubernetes.io/last-applied-configuration: {}
+          f:labels:
+            .: {}
+            f:app.kubernetes.io/component: {}
+            f:app.kubernetes.io/instance: {}
+            f:app.kubernetes.io/managed-by: {}
+            f:app.kubernetes.io/name: {}
+            f:helm.sh/chart: {}
+        f:spec:
+          f:clusterIP: {}
+          f:internalTrafficPolicy: {}
+          f:ports:
+            .: {}
+            k:{"port":9092,"protocol":"TCP"}:
+              .: {}
+              f:name: {}
+              f:port: {}
+              f:protocol: {}
+              f:targetPort: {}
+            k:{"port":9093,"protocol":"TCP"}:
+              .: {}
+              f:name: {}
+              f:port: {}
+              f:protocol: {}
+              f:targetPort: {}
+            k:{"port":9094,"protocol":"TCP"}:
+              .: {}
+              f:name: {}
+              f:port: {}
+              f:protocol: {}
+              f:targetPort: {}
+          f:selector: {}
+          f:sessionAffinity: {}
+          f:type: {}
+spec:
+  ports:
+    - name: tcp-client
+      protocol: TCP
+      port: 9092
+      targetPort: kafka-client
+      nodePort: 31022
+    - name: tcp-internal
+      protocol: TCP
+      port: 9094
+      targetPort: kafka-internal
+    - name: tcp-controller
+      protocol: TCP
+      port: 9093
+      targetPort: kafka-ctlr
+  selector:
+    app.kubernetes.io/component: kafka
+    app.kubernetes.io/instance: my-kafka
+    app.kubernetes.io/name: kafka
+  clusterIP: None
+  clusterIPs:
+    - None
+  type: LoadBalancer
+  sessionAffinity: None
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  internalTrafficPolicy: Cluster
+status:
+  loadBalancer: {}

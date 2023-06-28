@@ -41,14 +41,25 @@ body { font-family: Arial; }
     cursor: pointer;
 }
 #delete_function {
-    position: fixed;
-    bottom: 0;
-    left: 0;
     margin: 15px 75px;
     cursor: pointer;
 }
 textarea.codeflask__textarea.changes {
     background: #f7fefe;
+}
+.codeflask {
+    height: 88% !important;
+}
+#stdout {
+    background: #3333;
+    position: fixed;
+    z-index: 1;
+    width: 100%;
+    padding: 5px;
+    height: 100px;
+    bottom: -30px;
+    margin-left: -8px;
+    overflow: scroll;
 }
 </style>
 
@@ -57,8 +68,12 @@ textarea.codeflask__textarea.changes {
 
 <div class="function_list_container">
   <div id="new_function">+</div>
-  <ul id="function_list"></ul>
   <div id="delete_function">🗑️</div>
+  <ul id="function_list"></ul>
+</div>
+
+<div class="stdout">
+<pre id="stdout"></pre>
 </div>
 
 
@@ -130,12 +145,25 @@ function populate_function_list() {
     })
 }
 
+function populate_stdout() {
+    get('/stdout/' + window.fname, function(d) {
+        var o = document.getElementById('stdout')
+        var oo = ""
+        for (var i=d['stdouts'].length-1; i>=0; i--) {
+          oo += Math.floor(d['stdouts'][i]['tstamp']) + ' >> ' + d['stdouts'][i]['stdout'].trim().replaceAll("\n", "\n" + Math.floor(d['stdouts'][i]['tstamp']) + ' >> ') + "\n"
+        }
+        o.innerText = oo
+    })
+}
+
 function intervolate(fn, ms) { var i=setInterval(fn, ms); fn(); console.log(i); return i;}
 
 intervolate(populate_function_list, 2000)
+intervolate(populate_stdout, 5000)
 
 document.getElementById('new_function').onclick = function() {
     var new_fname = prompt("choose a dang filename")
+    if (!new_fname) return
     window.fname = new_fname
     post('/create/' + window.fname)
     populate_function_list()
@@ -143,6 +171,7 @@ document.getElementById('new_function').onclick = function() {
 
 document.getElementById('delete_function').onclick = function() {
     var fname = prompt("!!! give the function name you want to delete !!!")
+    if (!fname) return
     if (window.fname == fname) {
         window.fname = ''
     }
