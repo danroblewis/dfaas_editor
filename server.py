@@ -211,11 +211,15 @@ def stdout(fnname):
 
 @app.route('/fn_map')
 def fn_map():
-    return "<body style='background-color:black; text-align:center; margin-top:50px;'><img src='/fn_map.svg' /></body>"
+    level = request.args.get('level', 0)
+    return "<body style='background-color:black; text-align:center; margin-top:50px;'><a href='/fn_map?level=" + str((int(level)+1)%2) + "'><img src='/fn_map.svg?level=" + str(level) + "' /></a></body>"
 
 
 @app.route('/fn_map.svg')
 def fn_map_svg():
+    level = request.args.get('level', 0)
+    print(request.args)
+    print(level)
     mappings = reprocess_mappings()
 
     data = [ "digraph a {", "bgcolor=black" ]
@@ -242,11 +246,13 @@ def fn_map_svg():
                   data.append(f"\":{t}\" [style=filled color=lightblue label=\"\" shape=point]")
                 else:
                   data.append(f"\":{t}\" [style=filled color=lightblue]")
-                  
-              if len(params) == 0:
+              
+              if level == '0':
+                f = f"{fname}\n{params}"
+              elif level == '1':
                 f = fname
               else:
-                f = f"{fname}\n{params}"
+                f = fname
               data.append(f"\"{f}\" [style=filled color=darkseagreen1 shape=cylinder]")
 
               linecolor = 'gold'

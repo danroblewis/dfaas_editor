@@ -15,9 +15,6 @@ body { font-family: Arial; }
     left: 0;
     width: 100px;
 }
-.function_list_container #new_function {
-    padding: 10px 10px 10px 75px;
-}
 .function_list_container #new_function:hover {
     content: 'ⓧ';
 }
@@ -49,8 +46,11 @@ body { font-family: Arial; }
     cursor: pointer;
 }
 #delete_function {
-    margin: 15px 75px;
     cursor: pointer;
+}
+.function_list_container .actions {
+    text-align: center;
+    width: 150%;
 }
 textarea.codeflask__textarea.changes {
     background: #f7fefe;
@@ -75,8 +75,11 @@ textarea.codeflask__textarea.changes {
 <div id="function_code"></div>
 
 <div class="function_list_container">
-  <div id="new_function">+</div>
-  <div id="delete_function">🗑️</div>
+  <div class="actions">
+    <span id="new_function">➕</span>
+    <span id="delete_function">🗑️</span>
+    <span id="map"><a href="/fn_map" target="_fn_nmap">🗺️</a></span>
+  </div>
   <ul id="function_list"></ul>
 </div>
 
