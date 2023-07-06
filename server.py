@@ -95,15 +95,33 @@ def index():
 
 @app.route('/function_list')
 def function_list():
-    names = [ r['name'] for r in coll.find({}) ]
-    names += [ r['name'] for r in processes.find({}) ]
-    return names
+    dbnames = [ r['name'] for r in coll.find({}) ]
+    dbnames += [ r['name'] for r in processes.find({}) ]
 
+    config.load_incluster_config()
+    v1 = client.AppsV1Api()
+    replica_counts = {}
+    for b in v1.list_namespaced_deployment('default').items:
+      if not b.metadata.name.startswith('dfaas-'):
+        continue
+      if b.metadata.name == 'dfaas-webide-deployment':
+        continue
+      names = [ e.value for e in b.spec.template.spec.containers[0].env if e.name == 'FUNCTION_NAME' ]
+      if len(names) > 0:
+        name = names[0]
+        replica_counts[name] = (b.status.available_replicas or 0)
+
+    for name in dbnames:
+        if name not in replica_counts:
+            replica_counts[name] = 0
+    
+    return replica_counts
 
 @app.route('/read/<fname>')
 def readfn(fname):
     c = processes if fname.startswith('process:') else coll
     rec = c.find_one({ 'name': fname })
+    c.replace_one({'name': fname}, {'name': fname, 'code': rec['code'], 'last_update': datetime.datetime.now().timestamp() })
     return jsonify({ 'code': rec['code'] })
 
 
@@ -112,7 +130,7 @@ def writefn(fname):
     code = request.json['code']
     print("writing", code)
     c = processes if fname.startswith('process:') else coll
-    c.replace_one({'name': fname}, {'name': fname, 'code': code})
+    c.replace_one({'name': fname}, {'name': fname, 'code': code, 'last_update': datetime.datetime.now().timestamp() })
     if fname.startswith('process:'):
       mappings = reprocess_mappings()
       update_mappings(mappings)
@@ -125,7 +143,7 @@ def createfn(fname):
       processes.insert_one({'name': fname, 'code': ''})
       return {'success': True}
     else:
-      coll.insert_one({'name': fname, 'code': ''})
+      coll.insert_one({'name': fname, 'code': '@dfaas\ndef ' + fname + '(rec):\n    return rec\n\n'})
       kube_submission = yaml.safe_load(new_deployment_tpl.format(deployment_name=fname.replace("_","-"), function_name=fname))
       config.load_incluster_config()
       v1 = client.AppsV1Api()
@@ -156,12 +174,14 @@ def deletefn(fname):
 @app.route('/stdout/<fnname>')
 def stdout(fnname):
     #return {"stdouts":[{"stdout":"asdf\n","tstamp":1687981427.897007},{"stdout":"asdf\n","tstamp":1687981427.897456},{"stdout":"asdf\n","tstamp":1687981427.897657},{"stdout":"asdf\n","tstamp":1687981427.897852},{"stdout":"asdf\n","tstamp":1687981427.898045},{"stdout":"asdf\n","tstamp":1687981432.913297},{"stdout":"asdf\n","tstamp":1687981432.913751},{"stdout":"asdf\n","tstamp":1687981432.913994},{"stdout":"asdf\n","tstamp":1687981432.91423},{"stdout":"asdf\n","tstamp":1687981432.91447},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.919217},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.919816},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.921217},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.922535},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.926271}]}
+    if fnname.startswith('process:'):
+      return ''
 
     topic = fnname + '_stdout'
     
     consumer = kafka.KafkaConsumer(bootstrap_servers=[ os.environ['KAFKA_ADDRESS'] ])
     
-    dtstmp = datetime.datetime.now()-datetime.timedelta(minutes=2)
+    dtstmp = datetime.datetime.now()-datetime.timedelta(minutes=10)
     
     month_ago = dtstmp.timestamp()
     topic_partition = kafka.TopicPartition(topic, 0)
@@ -191,9 +211,14 @@ def stdout(fnname):
 
 @app.route('/fn_map')
 def fn_map():
+    return "<body style='background-color:black; text-align:center; margin-top:50px;'><img src='/fn_map.svg' /></body>"
+
+
+@app.route('/fn_map.svg')
+def fn_map_svg():
     mappings = reprocess_mappings()
 
-    data = [ "digraph a {" ]
+    data = [ "digraph a {", "bgcolor=black" ]
     for fname, apps in mappings.items():
       for from_topic, mapps in apps.items():
         for mapp in mapps:
@@ -220,14 +245,16 @@ def fn_map():
                 f = fname
               else:
                 f = f"{fname}\n({params})"
-              data.append(f"\"{f}\" [style=filled color=darkseagreen1]")
+              data.append(f"\"{f}\" [style=filled color=darkseagreen1 shape=cylinder]")
 
+              linecolor = 'gold'
+              penwidth = 2.0
               if from_topic == 'null':
-                data.append(f"\"{f}\"->\":{to_topic}\"")
+                data.append(f"\"{f}\"->\":{to_topic}\" [color={linecolor} penwidth={penwidth}]")
               elif to_topic == 'null':
-                data.append(f"\":{from_topic}\"->\"{f}\"")
+                data.append(f"\":{from_topic}\"->\"{f}\" [color={linecolor} penwidth={penwidth}]")
               else:
-                data.append(f"\":{from_topic}\"->\"{f}\"->\":{to_topic}\"")
+                data.append(f"\":{from_topic}\"->\"{f}\"->\":{to_topic}\" [color={linecolor} penwidth={penwidth}]")
     data.append("}")
 
     p = subprocess.Popen(['dot', '-Tsvg'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)

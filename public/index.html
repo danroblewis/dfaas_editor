@@ -37,6 +37,14 @@ body { font-family: Arial; }
 #function_list li.active {
     background: #eeccee44;
 }
+#function_list li.broken:before {
+    content: '⚠️';
+    margin-right: 3px;
+}
+#function_list li.process:before {
+    content: '🧊';
+    margin-right: 3px;
+}
 #new_function {
     cursor: pointer;
 }
@@ -96,6 +104,7 @@ flask.onUpdate(setChanged)
 window['flask'] = flask;
 
 window.fname = ""
+window.process = false
 window.changed = false
 
 function get(url, fn) {
@@ -120,37 +129,77 @@ function post(url, json, fn) {
     x.send(JSON.stringify(json));
 }
 
+function getProperName(_fname) {
+    var _procs = document.getElementById('function_list').getElementsByClassName('process')
+    for (var proc of _procs) {
+      if (_fname == proc.innerText) {
+        return 'process:' + _fname;
+      }
+    }
+    return _fname
+}
+console.log(getProperName('add_field'))
+console.log(getProperName('weather'))
+
 function open_file(_fname) {
-    window.fname = _fname;
-    console.log(window.fname)
+    window.fname = getProperName(_fname);
     get('/read/' + _fname, function(j) {
         flask.updateCode(j.code)
         setTimeout(setUnchanged, 100)
+        populate_stdout()
     })
 }
 
 function populate_function_list() {
-    get('/function_list', function(names) {
+    get('/function_list', function(replica_counts) {
         let ul = document.getElementById('function_list');
         let html = '';
-        for (var name of names) {
-            html += '<li ' + (name == window.fname ? 'class="active" ' : '') + '>' + name + '</li>';
+        arr = []
+        procs = []
+        for (var name in replica_counts) {
+            if (name.startsWith('process:')) {
+              process = true
+              procs.push([name, replica_counts[name]])
+            } else {
+              arr.push([name, replica_counts[name]])
+              process = false
+            }
+        }
+        arr = arr.concat(procs)
+        for (var o of arr) {
+            var name = o[0]
+            var c = o[1]
+            classes = []
+            if (name == window.fname) classes.push('active')
+            if (!name.startsWith('process:') && c == 0) classes.push('broken')
+            if (name.startsWith('process:')) {
+                classes.push('process')
+                name = name.replace("process:", "")
+            }
+            html += '<li '
+            if (classes.length > 0) {
+                html += 'class="' + classes.join(' ') + '"'
+            }
+            html += '>' + name + '</li>';
         }
         ul.innerHTML = html;
         for (var li of ul.getElementsByTagName('li')) {
             li.onclick = (function(_fname) {
-                return function() { open_file(_fname); populate_function_list(); }
+                return function() { open_file(getProperName(_fname)); populate_function_list(); }
             })(li.innerText)
         }
     })
 }
 
 function populate_stdout() {
-    get('/stdout/' + window.fname, function(d) {
+    if (!window.fname) return
+    if (getProperName(window.fname).startsWith('process:')) return
+    get('/stdout/' + getProperName(window.fname), function(d) {
         var o = document.getElementById('stdout')
         var oo = ""
         for (var i=d['stdouts'].length-1; i>=0; i--) {
-          oo += Math.floor(d['stdouts'][i]['tstamp']) + ' >> ' + d['stdouts'][i]['stdout'].trim().replaceAll("\n", "\n" + Math.floor(d['stdouts'][i]['tstamp']) + ' >> ') + "\n"
+          t = (new Date(d['stdouts'][i]['tstamp']*1000)).toISOString().replace("T"," ").slice(0,19)
+          oo += t + ' >> ' + d['stdouts'][i]['stdout'].trim().replaceAll("\n", "\n" + t + ' >> ') + "\n"
         }
         o.innerText = oo
     })
@@ -159,7 +208,10 @@ function populate_stdout() {
 function intervolate(fn, ms) { var i=setInterval(fn, ms); fn(); console.log(i); return i;}
 
 intervolate(populate_function_list, 2000)
-intervolate(populate_stdout, 5000)
+intervolate(populate_stdout, 10000)
+intervolate(function() {
+  get('/read/' + getProperName(window.fname), function(j) {});  
+}, 60*1000) // update the timestamp so the stdout logger keeps running
 
 document.getElementById('new_function').onclick = function() {
     var new_fname = prompt("choose a dang filename")
@@ -183,7 +235,7 @@ document.getElementById('delete_function').onclick = function() {
 document.addEventListener('keydown', e => {
     if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
-        post('/write/' + window.fname, {'code':flask.getCode()})
+        post('/write/' + getProperName(window.fname), {'code':flask.getCode()})
         setUnchanged()
     }
 });
