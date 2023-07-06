@@ -226,9 +226,11 @@ def fn_map_svg():
           for k,v in mapp['params'].items():
             if isinstance(v, str):
               params.append(f"{k}='{v}'")
+              #params.append(f"'{v}'")
             else:
               params.append(f"{k}={v}")
-          params = ",".join(params)
+              #params.append(f"{v}")
+          params = "\n".join(params)
 
           for out in mapp['outputs']:
             if 'default' in out:
@@ -244,7 +246,7 @@ def fn_map_svg():
               if len(params) == 0:
                 f = fname
               else:
-                f = f"{fname}\n({params})"
+                f = f"{fname}\n{params}"
               data.append(f"\"{f}\" [style=filled color=darkseagreen1 shape=cylinder]")
 
               linecolor = 'gold'
