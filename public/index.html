@@ -137,8 +137,13 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100px;
+    width: 150px;
     color: #ffcc33;
+    height: calc(100% - 120px);
+    overflow: scroll;
+}
+.function_list_container::-webkit-scrollbar {
+    width: 0 !important
 }
 .function_list_container #new_function:hover {
     content: 'ⓧ';
@@ -177,7 +182,7 @@ body {
 }
 .function_list_container .actions {
     text-align: center;
-    width: 150%;
+    width: 100%;
     margin-top: 10px;
 }
 textarea.codeflask__textarea {
@@ -202,18 +207,22 @@ textarea.codeflask__textarea.changes {
     border-radius: 0 0 30px 0;
     width: 30px !important;
     padding-right: 8px;
-    height: calc(100% - 80px);
+    height: 10000000px;
 }
 .codeflask.codeflask--has-line-numbers:before {
     background-color: #14110b !important;
     background: #14110b !important;
+    background: #3333;
+}
+.codeflask.codeflask--has-line-numbers::-webkit-scrollbar {
+    width: 0 !important
 }
 #function_code .codeflask {
+    overflow: auto;
     width: calc(100% - 160px) !important;
-    height: 85%;
+    height: calc(100% - 200px);
 }
 #stdout {
-    background: #3333;
     position: fixed;
     z-index: 1;
     width: 100%;
@@ -264,9 +273,20 @@ textarea.codeflask__textarea.changes {
 #map a {
     cursor: pointer;
 }
+.topswoop #title {
+    display: inline-block;
+    color: #ffcc33;
+    height: 100%;
+    margin-left: 100px;
+    background-color: #14110b;
+    text-align: center;
+    font-size: 25px;
+    padding: 9px 30px 0 30px;
+    text-transform: uppercase;
+}
 </style>
 
-<div class='topswoop'></div>
+<div class='topswoop'><div id="title"></div></div>
 <div class='topswoop_after'><p></p></div>
 <div class='code_container'>
   <div id="function_code"></div>
@@ -416,6 +436,7 @@ function getProperName(_fname) {
 
 function open_file(_fname) {
     window.fname = getProperName(_fname);
+    document.getElementById('title').innerHTML = _fname;
     params['fname'] = _fname
     var newsearch = '?' + Object.keys(params).map(function(v) { return v + "=" + params[v]; }).join("&")
     window.history.pushState(null, null, newsearch)
