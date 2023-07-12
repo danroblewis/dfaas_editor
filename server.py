@@ -1,4 +1,5 @@
 import flask
+import traceback
 from flask import Flask, jsonify, request, send_file
 import pymongo
 import os
@@ -10,6 +11,7 @@ import json
 from dfaal import parse_applications
 import kafka
 import datetime
+from contextlib import redirect_stdout
 
 conn = pymongo.MongoClient(os.environ['MONGODB_HOST'], int(os.environ['MONGODB_PORT']), username=os.environ['MONGODB_USER'], password=os.environ['MONGODB_PASSWORD'])
 coll = conn.test.dfaas_functions
@@ -37,6 +39,8 @@ def reprocess_mappings(sample=""):
     mappings = {}
 
     for f, fn, t in applications:
+      #print(f, fn, t)
+      #print(fn)
       from_name = f.name.replace(":","") if f else "null"
       fname = fn.name
       to_name = t.name.replace(":","") if t else "null"
@@ -78,13 +82,10 @@ def update_mappings(mappings):
     global apps
     # delete all current mappings
     res = apps.delete_many({})
-    print(res)
-    print(res.deleted_count)
 
     # insert all mappings from parameter
     for fname, applications in mappings.items():
       res = apps.insert_one({ "fname": fname, "applications": applications })
-      print(res)
 
 
 @app.route('/')
@@ -93,23 +94,35 @@ def index():
         return f.read()
 
 
+@app.route('/themes/<theme_id>')
+def theme(theme_id):
+    with open('public/themes/prism-' + theme_id + '.css') as f:
+        return f.read()
+
+
 @app.route('/function_list')
 def function_list():
     dbnames = [ r['name'] for r in coll.find({}) ]
     dbnames += [ r['name'] for r in processes.find({}) ]
 
-    config.load_incluster_config()
-    v1 = client.AppsV1Api()
+    try:
+      config.load_incluster_config()
+      v1 = client.AppsV1Api()
+    except:
+      pass
     replica_counts = {}
-    for b in v1.list_namespaced_deployment('default').items:
-      if not b.metadata.name.startswith('dfaas-'):
-        continue
-      if b.metadata.name == 'dfaas-webide-deployment':
-        continue
-      names = [ e.value for e in b.spec.template.spec.containers[0].env if e.name == 'FUNCTION_NAME' ]
-      if len(names) > 0:
-        name = names[0]
-        replica_counts[name] = (b.status.available_replicas or 0)
+    try:
+      for b in v1.list_namespaced_deployment('default').items:
+        if not b.metadata.name.startswith('dfaas-'):
+          continue
+        if b.metadata.name == 'dfaas-webide-deployment':
+          continue
+        names = [ e.value for e in b.spec.template.spec.containers[0].env if e.name == 'FUNCTION_NAME' ]
+        if len(names) > 0:
+          name = names[0]
+          replica_counts[name] = (b.status.available_replicas or 0)
+    except:
+      pass
 
     for name in dbnames:
         if name not in replica_counts:
@@ -128,12 +141,19 @@ def readfn(fname):
 @app.route('/write/<fname>', methods=['POST'])
 def writefn(fname):
     code = request.json['code']
-    print("writing", code)
     c = processes if fname.startswith('process:') else coll
     c.replace_one({'name': fname}, {'name': fname, 'code': code, 'last_update': datetime.datetime.now().timestamp() })
     if fname.startswith('process:'):
-      mappings = reprocess_mappings()
-      update_mappings(mappings)
+      f = io.StringIO()
+      with redirect_stdout(f):
+        try:
+          mappings = reprocess_mappings()
+          update_mappings(mappings)
+        except Exception as e:
+          print(traceback.format_exc())
+      s = f.getvalue()
+      print(s)
+      return {'stdout': s}
     return {'success': True}
 
 
@@ -206,7 +226,7 @@ def stdout(fnname):
                 consumer.close()
                 break
     
-    return { "stdouts": msgs }
+    return { "stdouts": msgs[-1:-50:-1] }
 
 
 @app.route('/fn_map')
@@ -218,8 +238,6 @@ def fn_map():
 @app.route('/fn_map.svg')
 def fn_map_svg():
     level = request.args.get('level', 0)
-    print(request.args)
-    print(level)
     mappings = reprocess_mappings()
 
     data = [ "digraph a {", "bgcolor=black" ]
@@ -277,6 +295,6 @@ def fn_map_svg():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3001)
+    app.run(host='0.0.0.0', port=3002)
 
 
