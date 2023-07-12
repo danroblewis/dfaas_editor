@@ -124,7 +124,10 @@
 </style>
 
 <style>
-body { font-family: monospace; background: #14110b; }
+body {
+    font-family: monospace;
+    background: #14110b;
+}
 #function_code {
     background: #14110b;
     margin-left: 150px;
@@ -180,25 +183,34 @@ body { font-family: monospace; background: #14110b; }
 textarea.codeflask__textarea {
     caret-color: red;
     color: black;
+    overflow: hidden;
+    width: calc(100%-80px);
 }
 textarea.codeflask__textarea.changes {
     background: #14110b;
     color: black;
 }
-.codeflask__lines {
-    color: #f5f6fa;
+#function_code .codeflask__pre {
+    width: calc(100% - 50px);
+}
+#function_code textarea.codeflask__textarea {
+    width: calc(100% - 50px) !important;
+}
+.code_container .codeflask__lines {
+    color: #666688;
     background-color: #333344;
     border-radius: 0 0 30px 0;
-    text-align: center;
     width: 30px !important;
     padding-right: 8px;
+    height: calc(100% - 80px);
 }
 .codeflask.codeflask--has-line-numbers:before {
     background-color: #14110b !important;
     background: #14110b !important;
 }
-.codeflask {
-    height: calc(100% - 200px) !important;
+#function_code .codeflask {
+    width: calc(100% - 160px) !important;
+    height: 85%;
 }
 #stdout {
     background: #3333;
@@ -209,17 +221,18 @@ textarea.codeflask__textarea.changes {
     height: 150px;
     bottom: -30px;
     margin-left: -8px;
-    overflow: scroll;
+    overflow: hidden;
     color: #ffcc33;
 }
 .code_container {
 }
 .topswoop {
     height: 50px;
+    width: calc(100% - 150px);
     background-color: #333344;
     margin-left: 150px;
     margin-right: -50px;
-    border-radius: 30px 0 0 0;
+    border-radius: 50px 0 0 0;
 }
 .topswoop_after {
     width: 20px;
@@ -227,14 +240,29 @@ textarea.codeflask__textarea.changes {
     background: #333344;
     position: absolute;
     left: 188px;
-    z-index: 2;
+    z-index: 3;
 }
 .topswoop_after p {
-    height: 40px;
-    width: 40px;
-    border-radius: 100px;
+    height: 20px;
+    width: 20px;
+    border-radius: 25px 0 0 0;
     background: #14110b;
     margin: 0;
+}
+#_map {
+    width: calc(100% - 270px);
+    height: calc(100% - 200px);
+    margin-left: 200px;
+    z-index: 1005;
+    position: absolute;
+    display: block;
+    padding: 10px;
+    max-height: 80%;
+    cursor: pointer;
+    visibility: hidden;
+}
+#map a {
+    cursor: pointer;
 }
 </style>
 
@@ -244,11 +272,13 @@ textarea.codeflask__textarea.changes {
   <div id="function_code"></div>
 </div>
 
+<img id='_map' src="http://node1:3002/fn_map.svg?level=1"></iframe>
+
 <div class="function_list_container">
   <div class="actions">
     <span id="new_function">➕</span>
     <span id="delete_function">🗑️</span>
-    <span id="map"><a href="/fn_map?level=1" target="_fn_nmap">🗺️</a></span>
+    <span id="map"><a>🗺️</a></span>
   </div>
   <ul id="function_list"></ul>
 </div>
@@ -260,8 +290,6 @@ textarea.codeflask__textarea.changes {
 
 <script type='text/javascript'>
 var params = window.location.search.length == 0 ? {} : window.location.search.slice(1).split("&").reduce(function(a, v) { var t=v.split("="); a[t[0]]=t[1]; return a; }, {})
-
-
 
 Prism.languages.python = {
 	'comment': {
@@ -489,6 +517,17 @@ document.addEventListener('keydown', e => {
         setUnchanged()
     }
 });
+
+document.getElementById('map').onclick = function() {
+    var m = document.getElementById('_map')
+    m.style.visibility = m.style.visibility == 'visible' ? 'hidden' : 'visible'
+}
+document.getElementById('_map').onclick = function() {
+    var m = document.getElementById('_map')
+    var i = parseInt(m.src.split("?")[1].split("level=")[1].split("&")[0]);
+    i = (i + 1) % 2;
+    m.src = "/fn_map.svg?level=" + i + "&cachebust=" + (new Date()).getTime()
+}
 
 if (fname != '') {
   open_file(fname)

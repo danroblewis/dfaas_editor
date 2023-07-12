@@ -240,7 +240,7 @@ def fn_map_svg():
     level = request.args.get('level', 0)
     mappings = reprocess_mappings()
 
-    data = [ "digraph a {", "bgcolor=black" ]
+    data = [ "digraph a {", "bgcolor=transparent" ]
     for fname, apps in mappings.items():
       for from_topic, mapps in apps.items():
         for mapp in mapps:
