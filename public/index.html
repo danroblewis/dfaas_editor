@@ -3,6 +3,12 @@
 <script src="codeflask.min.js"></script>
 
 <style type="text/css">
+
+pre .token.keyword:visible {
+    background: white;
+}
+
+
  code[class*="language-"], pre[class*="language-"] {
  /*
      font-family: Consolas, Menlo, Monaco, "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", "Courier New", Courier, monospace;
@@ -141,6 +147,7 @@ body {
     color: #ffcc33;
     height: calc(100% - 120px);
     overflow: scroll;
+    user-select: none;
 }
 .function_list_container::-webkit-scrollbar {
     width: 0 !important
@@ -153,6 +160,7 @@ body {
     padding: 0;
     width: 150px;
     overflow: hidden;
+    padding-top: 20px;
 }
 #function_list li {
     padding: 5px 10px;
@@ -203,11 +211,12 @@ textarea.codeflask__textarea.changes {
 }
 .code_container .codeflask__lines {
     color: #666688;
-    background-color: #333344;
+    background-color: #344470;
     border-radius: 0 0 30px 0;
     width: 30px !important;
     padding-right: 8px;
     height: 10000000px;
+    user-select: none;
 }
 .codeflask.codeflask--has-line-numbers:before {
     background-color: #14110b !important;
@@ -226,27 +235,46 @@ textarea.codeflask__textarea.changes {
     position: fixed;
     z-index: 1;
     width: 100%;
-    padding: 5px;
-    height: 150px;
+    padding: 10px 5px 5px 5px;
+    height: 145px;
     bottom: -30px;
     margin-left: -8px;
-    overflow: hidden;
+    overflow: auto;
     color: #ffcc33;
+}
+#stdout::-webkit-scrollbar {
+    width: 0 !important
 }
 .code_container {
 }
 .topswoop {
     height: 50px;
     width: calc(100% - 150px);
-    background-color: #333344;
+    background-color: #344470;
     margin-left: 150px;
     margin-right: -50px;
     border-radius: 50px 0 0 0;
+    -webkit-app-region: drag;
 }
+.topswoop .button {
+    display: inline-block;
+    font-size: 15px;
+    float: right;
+    padding: 32px 52px 0 5px;
+    height: 18px;
+    border-left: 3px solid #14110b;
+    font-weight: bold;
+    width: 30px;
+    user-select: none;
+    -webkit-app-region: no-drag;
+}
+.topswoop #new_function { background: #7799dd; }
+.topswoop #delete_function { background: #ff7744; }
+.topswoop #map { background: #99dd66; }
 .topswoop_after {
     width: 20px;
     height: 20px;
-    background: #333344;
+    background: #344470;
     position: absolute;
     left: 188px;
     z-index: 3;
@@ -270,36 +298,71 @@ textarea.codeflask__textarea.changes {
     cursor: pointer;
     visibility: hidden;
 }
-#map a {
-    cursor: pointer;
-}
+#map { cursor: pointer; }
 .topswoop #title {
     display: inline-block;
     color: #ffcc33;
     height: 100%;
+    min-width: 250px;
     margin-left: 100px;
     background-color: #14110b;
-    text-align: center;
     font-size: 25px;
     padding: 9px 30px 0 30px;
     text-transform: uppercase;
+    text-align: left;
+    user-select: none;
+    -webkit-app-region: drag;
+    -webkit-user-select: none;
+}
+
+#new_dialog {
+    position: absolute;
+    left: 40%;
+    top: 40%;
+    text-transform: uppercase;
+    z-index: 5;
+    padding: 10px 10px 10px 20px;
+    background-color: #7799dd;
+    border-radius: 30px;
+    font-size: 15px;
+    font-weight: bold;
+    visibility: hidden;
+}
+#new_dialog input {
+    padding: 10px;
+    border: none;
+    caret-color: red;
+    color: #ffcc33;
+    background: #14110b;
+    border-radius: 20px;
 }
 </style>
 
-<div class='topswoop'><div id="title"></div></div>
+<audio id='click_sound' src='/asset/click.wav' volume="0.1"></audio>
+<audio id='newfile_sound' src='/asset/new_file.mp3' volume="0.1"></audio>
+<audio id='error_sound' src='/asset/error.mp3' volume="0.1"></audio>
+<audio id='deletefile_sound' src='/asset/delete_file.mp3' volume="0.1"></audio>
+<audio id='savefile_sound' src='/asset/save_file.mp3' volume="0.1"></audio>
+
+<div class='topswoop'>
+    <div id="title"></div>
+    <div class='button' id="map">MAP</div>
+    <div class='button' id="delete_function">DELETE</div>
+    <div class='button' id="new_function">NEW</div>
+</div>
 <div class='topswoop_after'><p></p></div>
 <div class='code_container'>
   <div id="function_code"></div>
 </div>
 
+<div id="new_dialog">
+    <span>New function name</span>
+    <input id="new_dialog_textbox" type=text />
+</div>
+
 <img id='_map' src="http://node1:3002/fn_map.svg?level=1"></iframe>
 
 <div class="function_list_container">
-  <div class="actions">
-    <span id="new_function">➕</span>
-    <span id="delete_function">🗑️</span>
-    <span id="map"><a>🗺️</a></span>
-  </div>
   <ul id="function_list"></ul>
 </div>
 
@@ -379,6 +442,11 @@ Prism.languages.python['string-interpolation'].inside['interpolation'].inside.re
 Prism.languages.py = Prism.languages.python;
 
 
+click_sound.volume = 0.15
+newfile_sound.volume = 0.15
+error_sound.volume = 0.15
+deletefile_sound.volume = 0.15
+savefile_sound.volume = 0.15
 
 const flask = new CodeFlask('#function_code', {
   language: 'py',
@@ -435,7 +503,9 @@ function getProperName(_fname) {
 }
 
 function open_file(_fname) {
+    click_sound.play()
     window.fname = getProperName(_fname);
+    document.getElementById('stdout').innerText = ""
     document.getElementById('title').innerHTML = _fname;
     params['fname'] = _fname
     var newsearch = '?' + Object.keys(params).map(function(v) { return v + "=" + params[v]; }).join("&")
@@ -511,20 +581,48 @@ intervolate(function() {
 }, 60*1000) // update the timestamp so the stdout logger keeps running
 
 document.getElementById('new_function').onclick = function() {
-    var new_fname = prompt("choose a dang filename")
-    if (!new_fname) return
+    click_sound.play()
+    var d = document.getElementById('new_dialog')
+    var v = d.style.visibility = d.style.visibility == 'visible'
+    if (!v) {
+        setTimeout(function() { document.getElementById('new_dialog_textbox').focus(); }, 20)
+    }
+    document.getElementById('new_dialog_textbox').value = ''
+    d.style.visibility = v ? 'hidden' : 'visible';
+}
+document.getElementById('new_dialog_textbox').onkeydown = function() {
+    if (event.keyCode == 27) {
+        document.getElementById('new_dialog').style.visibility = 'hidden'
+        document.getElementById('new_dialog_textbox').value = ''
+    }
+    if (event.keyCode != 13) return;
+    var new_fname = document.getElementById('new_dialog_textbox').value
+    if (new_fname == "") {
+        error_sound.play()
+        return
+    }
+    newfile_sound.play()
     window.fname = new_fname
+    document.getElementById('new_dialog').style.visibility = 'hidden';
+    document.getElementById('new_dialog_textbox').value = ''
     post('/create/' + window.fname)
-    populate_function_list()
+    setTimeout(function() {
+      populate_function_list()
+      open_file(window.fname)
+    }, 20);
 }
 
 document.getElementById('delete_function').onclick = function() {
-    var fname = prompt("!!! give the function name you want to delete !!!")
-    if (!fname) return
-    if (window.fname == fname) {
-        window.fname = ''
+    click_sound.play()
+    var confirmed = confirm("!!! Are you sure you want to delete `" + window.fname + " !!!")
+    if (!confirmed) {
+        return
     }
-    open_file(window.fname)
+    var fname = window.fname
+    window.fname = ''
+    open_file('')
+    flask.updateCode('')
+    deletefile_sound.play()
     post('/delete/' + fname)
     populate_function_list()
 }
@@ -534,16 +632,23 @@ document.addEventListener('keydown', e => {
         e.preventDefault();
         post('/write/' + getProperName(window.fname), {'code':flask.getCode()}, function(d) {
             if (d.stdout) document.getElementById('stdout').innerHTML = d.stdout
+            savefile_sound.play()
         })
         setUnchanged()
     }
 });
 
 document.getElementById('map').onclick = function() {
+    click_sound.play()
     var m = document.getElementById('_map')
-    m.style.visibility = m.style.visibility == 'visible' ? 'hidden' : 'visible'
+    var splot = m.style.visibility == 'visible' ? 'hidden' : 'visible'
+    var splet = m.style.visibility == 'visible' ? 'visible' : 'hidden'
+    m.style.visibility = splot
+    document.getElementsByClassName('codeflask__pre')[0].style.visibility = splet
+    document.getElementsByClassName('codeflask__textarea')[0].style.visibility = splet
 }
 document.getElementById('_map').onclick = function() {
+    click_sound.play()
     var m = document.getElementById('_map')
     var i = parseInt(m.src.split("?")[1].split("level=")[1].split("&")[0]);
     i = (i + 1) % 2;

@@ -99,6 +99,13 @@ def theme(theme_id):
     with open('public/themes/prism-' + theme_id + '.css') as f:
         return f.read()
 
+@app.route('/asset/<asset_name>')
+def asset(asset_name):
+    with open('public/assets/' + asset_name, 'rb') as f:
+        return send_file(
+            io.BytesIO(f.read()),
+            download_name=asset_name)
+
 
 @app.route('/function_list')
 def function_list():
@@ -261,9 +268,9 @@ def fn_map_svg():
                 if t == 'null':
                   continue
                 if 'dyntopic_' in t:
-                  data.append(f"\":{t}\" [style=filled color=lightblue label=\"\" shape=point]")
+                  data.append(f"\":{t}\" [style=filled color=\"#88bbff\" label=\"\" shape=point]")
                 else:
-                  data.append(f"\":{t}\" [style=filled color=lightblue]")
+                  data.append(f"\":{t}\" [style=filled color=\"#88bbff\"]")
               
               if level == '0':
                 f = f"{fname}\n{params}"
@@ -271,7 +278,7 @@ def fn_map_svg():
                 f = fname
               else:
                 f = fname
-              data.append(f"\"{f}\" [style=filled color=darkseagreen1 shape=cylinder]")
+              data.append(f"\"{f}\" [style=filled color=\"#99dd66\" shape=cylinder]")
 
               linecolor = 'gold'
               penwidth = 2.0
