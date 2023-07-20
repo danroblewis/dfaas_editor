@@ -1,0 +1,311 @@
+<title>DFaaS Progress Screen</title>
+
+<style type="text/css">
+body {
+    font-family: arial;
+    margin: 0;
+    padding: 0;
+}
+#background {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 20px 0 20px 20px;
+    background: #14110b;
+    z-index: -1;
+    margin: 0;
+    padding: 0;
+}
+body.not_electron {
+    background: #14110b;
+}
+.topic_list_container {
+    font-family: monospace;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 150px;
+    color: #ffcc33;
+    height: calc(100% - 120px);
+    overflow: scroll;
+    user-select: none;
+}
+.topic_list_container::-webkit-scrollbar {
+    width: 0 !important
+}
+.topic_list_container #new_function:hover {
+    content: 'ⓧ';
+}
+#topic_list {
+    list-style: none;
+    padding: 0;
+    width: 150px;
+    overflow: hidden;
+    padding-top: 20px;
+}
+#topic_list li {
+    padding: 5px 10px;
+    margin: 0;
+    width: 150px;
+}
+#topic_list li:hover {
+    background: #eeddee33;
+    cursor: pointer;
+}
+#topic_list li.active {
+    background: #eeccee44;
+}
+#topic_list li.broken:before {
+    content: '⭕';
+    margin-right: 3px;
+}
+#topic_list li.process:before {
+    content: '📍';
+    margin-right: 3px;
+}
+.topswoop {
+    height: 50px;
+    width: calc(100% - 150px);
+    background-color: #344470;
+    margin-left: 150px;
+    margin-right: -50px;
+    border-radius: 50px 0 0 0;
+    -webkit-app-region: drag;
+}
+.topswoop .button {
+    display: inline-block;
+    font-size: 15px;
+    float: right;
+    padding: 32px 52px 0 5px;
+    height: 18px;
+    border-left: 3px solid #14110b;
+    font-weight: bold;
+    width: 30px;
+    user-select: none;
+    -webkit-app-region: no-drag;
+    cursor: pointer;
+}
+.topswoop #new_function { background: #7799dd; }
+.topswoop #delete_function { background: #ff7744; }
+.topswoop #reboot_function { background: #ffcc33; }
+.topswoop #map { background: #99dd66; }
+.topswoop_after {
+    width: 20px;
+    height: 20px;
+    background: #344470;
+    position: absolute;
+    left: 200px;
+    z-index: 3;
+}
+.topswoop_after p {
+    height: 20px;
+    width: 20px;
+    border-radius: 25px 0 0 0;
+    background: #14110b;
+    margin: 0;
+}
+.topswoop #title {
+    display: inline-block;
+    color: #ffcc33;
+    height: 100%;
+    min-width: 250px;
+    margin-left: 100px;
+    background-color: #14110b;
+    font-size: 25px;
+    padding: 9px 30px 0 30px;
+    text-transform: uppercase;
+    text-align: left;
+    user-select: none;
+    -webkit-app-region: drag;
+    -webkit-user-select: none;
+}
+.sideswoop {
+    height: 100%;
+    width: 50px;
+    background: #344470;
+    position: absolute;
+    left: 150px;
+}
+.gauge {
+    width: 300px;
+    height: 150px;
+    position: absolute;
+    left: 300px;
+    top: calc(50% - 100px);
+    overflow: hidden;
+}
+.gauge .gauge-background {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: #222;
+    border-radius: 300px 300px 0 0;
+}
+.gauge .gauge-data {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: #3F51B5;
+    border-radius: 300px 300px 0 0;
+    transform: rotate(0.4turn);
+    transform-origin: center bottom;
+}
+.gauge .gauge-middle {
+    width: 50%;
+    height: 50%;
+    background: #14110b;
+    position: absolute;
+    left: 25%;
+    top: 50%;
+    border-radius: 150px 150px 0 0;
+    color: #ffcc33;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    font-family: revert;
+    font-size: 25px;
+}
+.gauge-title {
+    color: #ffcc33;
+    position: absolute;
+    left: 60%;
+    top: 400px;
+    width: 35%;
+    
+}
+</style>
+
+
+<audio id='click_sound' src='/asset/click.wav' volume="0.1"></audio>
+<audio id='newfile_sound' src='/asset/new_file.mp3' volume="0.1"></audio>
+<audio id='error_sound' src='/asset/error.mp3' volume="0.1"></audio>
+<audio id='deletefile_sound' src='/asset/delete_file.mp3' volume="0.1"></audio>
+<audio id='savefile_sound' src='/asset/save_file.mp3' volume="0.1"></audio>
+<audio id='reboot_sound' src='/asset/reboot.mp3' volume="0.1"></audio>
+
+<div id="background"></div>
+
+<div class='topswoop'>
+  <div id="title">asdf</div>
+  <div class='button' id="map">MAP</div>
+  <div class='button' id="delete_function">DELETE</div>
+  <div class='button' id="new_function">NEW</div>
+  <div class='button' id="reboot_function">REBOOT</div>
+</div>
+<div class='topswoop_after'><p></p></div>
+
+<div class="topic_list_container">
+  <ul id="topic_list">
+    <li>asdf</li>
+    <li>asdf</li>
+    <li>asdf</li>
+  </ul>
+</div>
+<div class='sideswoop'>
+</div>
+
+
+<div class='gauge'>
+  <div class='gauge-background'></div>
+  <div class='gauge-data'></div>
+  <div class='gauge-middle'>3.46</div>
+</div>
+
+<div class='gauge-title'>content</div>
+
+<script type='text/javascript'>
+var params = window.location.search.length == 0 ? {} : window.location.search.slice(1).split("&").reduce(function(a, v) { var t=v.split("="); a[t[0]]=t[1]; return a; }, {})
+
+if (navigator.userAgent.indexOf('Electron') == -1) {
+    document.body.classList.add('not_electron')
+}
+
+click_sound.volume = 0.15
+newfile_sound.volume = 0.15
+error_sound.volume = 0.15
+deletefile_sound.volume = 0.15
+savefile_sound.volume = 0.15
+reboot_sound.volume = 0.15
+
+function get(url, fn) {
+    var x = new XMLHttpRequest();
+    x.onreadystatechange = (function() {
+        return function() {
+            if (this.readyState == 4 && this.status == 200) {
+                fn(JSON.parse(x.responseText))
+            }
+        }
+    })(fn)
+    x.open('GET', url, true);
+    x.send();
+}
+function post(url, json, fn) {
+    var x = new XMLHttpRequest();
+    x.onreadystatechange = (function() {
+        return function() {
+            if (this.readyState == 4 && this.status == 200) {
+                fn && fn(JSON.parse(x.responseText))
+            }
+        }
+    })(fn)
+    x.open('POST', url, true);
+    x.setRequestHeader('Content-Type', 'application/json');
+    x.send(JSON.stringify(json));
+}
+
+function intervolate(fn, ms) { var i=setInterval(fn, ms); fn(); return i;}
+
+
+var topic_name = ""
+
+function open_topic(_topic_name) {
+    topic_name = _topic_name
+    document.querySelector('#title').innerText = topic_name
+    update_gauge()
+}
+
+function populate_list() {
+    get('/topic_list', function(topics) {
+        var html = ""
+        for (var topic in topics) {
+            if (!topic.startsWith('progress__')) continue;
+            html += '<li class="' + (topic == topic_name ? "selected" : "") + '">' + topic + '</li>'
+        }
+        document.getElementById('topic_list').innerHTML = html
+        for (var li of document.querySelectorAll('#topic_list li')) {
+            li.onclick = function() {
+                open_topic(event.target.innerText)
+                click_sound.play()
+            }
+        }
+    })
+}
+
+intervolate(populate_list, 5000)
+
+function update_gauge() {
+    get('/last_message/' + topic_name, function(data) {
+        for (var i in data) {
+            if (typeof data[i] == 'number') {
+                var middle = document.querySelector('.gauge .gauge-data')
+                var text = document.querySelector('.gauge .gauge-middle')
+                text.innerText = Math.floor(data[i]*10000)/100
+                var rot = data[i] / 2 + 0.5
+                middle.style.transform = 'rotate(' + rot + 'turn)'
+                break
+            }
+        }
+        for (var i in data) {
+            if (typeof data[i] == 'string') {
+                var t = document.querySelector('.gauge-title')
+                // assume the number is between 0 and 1
+                t.innerText = data[i]
+                break
+            }
+        }
+    })
+}
+intervolate(update_gauge, 5000)
+
+
+</script>

@@ -24,8 +24,8 @@ function   = (
 param      = fn_param ws ","* ws
 
 param   = (
-              (param_name ws "=" ws "'" string "'")
-            / (param_name ws "=" ws '"' string '"')
+              (param_name ws "=" ws string)
+            / (param_name ws "=" ws string)
             / (param_name ws "=" ws number)
             / (param_name ws "=" ws var_name)
           )
@@ -33,7 +33,10 @@ param   = (
 var_name   = ~"[A-Za-z_][A-Za-z0-9_]*"
 
 param_name   = ~"[A-Za-z_][A-Za-z0-9_]*"
-string     = ~"[A-Za-z0-9_\.:/\?=\[\] \*]*"
+string     = (
+                 ( '"' ~"[\+\-\.#A-Za-z0-9_\.:/\?=\[\] \*{}]*" '"' )
+               / ( "'" ~"[\+\-\.#A-Za-z0-9_\.:/\?=\[\] \*{}]*" "'" )
+             )
 fn_name    = ~"[A-Za-z_][A-Za-z0-9_]*"
 
 topic      = ~":[A-Za-z_][A-Za-z0-9_]*"
@@ -82,7 +85,7 @@ def walk_param(n, param, s=[]):
   if n.expr.name == 'param_name':
     param.name = n.text.strip()
   if n.expr.name == 'string':
-    param.value = n.text
+    param.value = n.text[1:-1]
   if n.expr.name == 'number':
     param.value = float(n.text)
   for c in n.children: walk_param(c, param, s+[n])

@@ -162,7 +162,7 @@ body.not_electron {
     left: 0;
     width: 150px;
     color: #ffcc33;
-    height: calc(100% - 120px);
+    height: 100%;
     overflow: scroll;
     user-select: none;
 }
@@ -246,7 +246,7 @@ textarea.codeflask__textarea.changes {
 #function_code .codeflask {
     overflow: auto;
     width: calc(100% - 160px) !important;
-    height: calc(100% - 200px);
+    height: calc(100% - 50px);
 }
 #stdout {
     position: fixed;
@@ -369,9 +369,6 @@ textarea.codeflask__textarea.changes {
 <div class='topswoop'>
     <div id="title"></div>
     <div class='button' id="map">MAP</div>
-    <div class='button' id="delete_function">DELETE</div>
-    <div class='button' id="new_function">NEW</div>
-    <div class='button' id="reboot_function">REBOOT</div>
 </div>
 <div class='topswoop_after'><p></p></div>
 <div class='code_container'>
@@ -388,10 +385,6 @@ textarea.codeflask__textarea.changes {
 
 <div class="function_list_container">
   <ul id="function_list"></ul>
-</div>
-
-<div class="stdout">
-<pre id="stdout"></pre>
 </div>
 
 
@@ -536,24 +529,31 @@ function getProperName(_fname) {
 }
 
 function open_file(_fname) {
-    flask.updateCode('')
     window.fname = getProperName(_fname);
-    document.getElementById('stdout').innerText = ""
     document.getElementById('title').innerHTML = _fname;
     params['fname'] = _fname
     process =  _fname.startsWith('process:')
     var newsearch = '?' + Object.keys(params).map(function(v) { return v + "=" + params[v]; }).join("&")
     window.history.pushState(null, null, newsearch)
-    get('/read/' + _fname, function(j) {
-        flask.updateCode(j.code)
-        setTimeout(setUnchanged, 100)
-        populate_stdout()
+    get('/stdout/:' + _fname + "?time=20", function(d) {
+        var oo = ""
+        for (var i=0; i < d['stdouts'].length-1; i++) {
+            if ('tstamp' in d['stdouts'][i]) {
+                t = d['stdouts'][i]['tstamp'].slice(0,19)
+                delete d['stdouts'][i]['tstamp']
+            } else {
+                t = ""
+            }
+            oo += t + ' >> ' + JSON.stringify(d['stdouts'][i]).replaceAll("\n", "\n" + t + ' >> ') + "\n"
+        }
+        flask.updateCode(oo)
     })
-    click_sound.play()
+    //click_sound.play()
 }
+setInterval(function() { open_file(window.fname); }, 5000)
 
 function populate_function_list() {
-    get('/function_list', function(replica_counts) {
+    get('/topic_list', function(replica_counts) {
         let ul = document.getElementById('function_list');
         let html = '';
         arr = []
@@ -594,38 +594,10 @@ function populate_function_list() {
     })
 }
 
-function populate_stdout() {
-    if (!window.fname) return
-    if (getProperName(window.fname).startsWith('process:')) return
-    get('/stdout/' + getProperName(window.fname), function(d) {
-        var o = document.getElementById('stdout')
-        var oo = ""
-        for (var i=0; i < d['stdouts'].length-1; i++) {
-          t = (new Date(d['stdouts'][i]['tstamp']*1000)).toISOString().replace("T"," ").slice(0,19)
-          oo += t + ' >> ' + d['stdouts'][i]['stdout'].trim().replaceAll("\n", "\n" + t + ' >> ') + "\n"
-        }
-        o.innerText = oo
-    })
-}
-
 function intervolate(fn, ms) { var i=setInterval(fn, ms); fn(); return i;}
 
 intervolate(populate_function_list, 2000)
-intervolate(populate_stdout, 5000)
-intervolate(function() {
-  get('/read/' + getProperName(window.fname), function(j) {});  
-}, 60*1000) // update the timestamp so the stdout logger keeps running
 
-document.getElementById('new_function').onclick = function() {
-    var d = document.getElementById('new_dialog')
-    var v = d.style.visibility = d.style.visibility == 'visible'
-    if (!v) {
-        setTimeout(function() { document.getElementById('new_dialog_textbox').focus(); }, 20)
-    }
-    document.getElementById('new_dialog_textbox').value = ''
-    d.style.visibility = v ? 'hidden' : 'visible';
-    click_sound.play()
-}
 document.getElementById('new_dialog_textbox').onkeydown = function() {
     if (event.keyCode == 27) {
         document.getElementById('new_dialog').style.visibility = 'hidden'
