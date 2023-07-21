@@ -274,9 +274,9 @@ textarea.codeflask__textarea.changes {
 }
 .topswoop .button {
     display: inline-block;
-    font-size: 15px;
+    font-size: 13px;
     float: right;
-    padding: 32px 52px 0 5px;
+    padding: 32px 42px 0 5px;
     height: 18px;
     border-left: 3px solid #14110b;
     font-weight: bold;
@@ -284,11 +284,13 @@ textarea.codeflask__textarea.changes {
     user-select: none;
     -webkit-app-region: no-drag;
     cursor: pointer;
+    text-decoration: none;
+    color: black;
 }
-.topswoop #new_function { background: #7799dd; }
-.topswoop #delete_function { background: #ff7744; }
-.topswoop #reboot_function { background: #ffcc33; }
-.topswoop #map { background: #99dd66; }
+.topswoop .btn-blue { background: #7799dd; }
+.topswoop .btn-red { background: #ff7744; }
+.topswoop .btn-yellow { background: #ffcc33; }
+.topswoop .btn-green { background: #99dd66; }
 .topswoop_after {
     width: 20px;
     height: 20px;
@@ -368,7 +370,10 @@ textarea.codeflask__textarea.changes {
 
 <div class='topswoop'>
     <div id="title"></div>
-    <div class='button' id="map">MAP</div>
+    <a class='button btn-yellow' href='/'>FNS</a>
+    <a class='button btn-red' href='/progress'>PROG</a>
+    <a class='button btn-blue' href='/topics'>TOPICS</a>
+    <div class='button btn-green' id="map">MAP</div>
 </div>
 <div class='topswoop_after'><p></p></div>
 <div class='code_container'>
@@ -618,26 +623,6 @@ document.getElementById('new_dialog_textbox').onkeydown = function() {
       open_file(window.fname)
     }, 20);
     newfile_sound.play()
-}
-
-document.getElementById('delete_function').onclick = function() {
-    var confirmed = confirm("!!! Are you sure you want to delete `" + window.fname + " !!!")
-    if (!confirmed) {
-        return
-    }
-    var fname = window.fname
-    window.fname = ''
-    open_file('')
-    flask.updateCode('')
-    deletefile_sound.play()
-    post('/delete/' + fname)
-    populate_function_list()
-    click_sound.play()
-}
-
-document.getElementById('reboot_function').onclick = function() {
-    post('/reboot/' + fname)
-    reboot_sound.play()
 }
 
 document.addEventListener('keydown', e => {

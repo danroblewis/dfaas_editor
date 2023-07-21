@@ -1,6 +1,6 @@
 import flask
 import traceback
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, Response
 import pymongo
 import os
 import yaml
@@ -11,7 +11,9 @@ import json
 from dfaal import parse_applications
 import kafka
 import datetime
+from dateutil.relativedelta import relativedelta
 from contextlib import redirect_stdout
+import base64
 
 conn = pymongo.MongoClient(os.environ['MONGODB_HOST'], int(os.environ['MONGODB_PORT']), username=os.environ['MONGODB_USER'], password=os.environ['MONGODB_PASSWORD'])
 coll = conn.test.dfaas_functions
@@ -80,6 +82,13 @@ def reprocess_mappings(sample=""):
 
 def update_mappings(mappings):
     global apps
+    # test if any functions are missing
+    needed_functions = set(mappings.keys())
+    known_functions = set([ k['name'] for k in coll.find({}) ])
+    missing_functions = needed_functions - known_functions
+    if len(missing_functions) > 0:
+        raise Exception("Some functions don't exist: " + ", ".join(missing_functions))
+        
     # delete all current mappings
     res = apps.delete_many({})
 
@@ -88,9 +97,31 @@ def update_mappings(mappings):
       res = apps.insert_one({ "fname": fname, "applications": applications })
 
 
+@app.before_request
+def basic_auth():
+    auth = request.headers.get('Authorization', None)
+    if auth is None:
+        return Response(status=401, headers={'WWW-Authenticate': 'Basic realm="enter user and pass"'})
+    u, p = base64.b64decode(auth.split(" ")[1].encode()).decode().split(":")
+    if u != "dfaas" or p != "startrek":
+        return Response(status=401, headers={'WWW-Authenticate': 'Basic realm="wrong user or pass"'})
+
+
 @app.route('/')
 def index():
     with open('public/index.html') as f:
+        return f.read()
+
+
+@app.route('/topics')
+def topics():
+    with open('public/topics.html') as f:
+        return f.read()
+
+
+@app.route('/progress')
+def progress():
+    with open('public/progress.html') as f:
         return f.read()
 
 
@@ -137,6 +168,23 @@ def function_list():
     
     return replica_counts
 
+@app.route('/topic_list')
+def topic_list():
+    mappings = reprocess_mappings()
+    topics = set()
+    for fnname, mapping in mappings.items():
+        for from_topic, outlist in mapping.items():
+            topics.add(from_topic)
+            for out in outlist:
+                for o in out['outputs']:
+                    for k,v in o.items():
+                        topics.add(v)
+    topics.remove("null")
+    ret = {}
+    for t in topics:
+        ret[t] = 1
+    return ret
+
 @app.route('/read/<fname>')
 def readfn(fname):
     c = processes if fname.startswith('process:') else coll
@@ -159,7 +207,6 @@ def writefn(fname):
         except Exception as e:
           print(traceback.format_exc())
       s = f.getvalue()
-      print(s)
       return {'stdout': s}
     return {'success': True}
 
@@ -176,6 +223,22 @@ def createfn(fname):
       v1 = client.AppsV1Api()
       resp = v1.create_namespaced_deployment(body=kube_submission, namespace="default")
       return {'success': True}
+
+
+@app.route('/reboot/<fname>', methods=['POST'])
+def reboot(fname):
+    if fname.startswith('process:'):
+      return {'success': True}
+    else:
+      config.load_incluster_config()
+      core_client = client.CoreV1Api()
+      pod_prefix = 'dfaas-' + fname.replace("_", "-") + "-"
+      for app in core_client.list_namespaced_pod("default").items:
+          if app.metadata.name.startswith(pod_prefix):
+              print(app.metadata.name)
+              resp = core_client.delete_namespaced_pod(app.metadata.name, 'default')
+      return {'success': True}
+
 
 
 @app.route('/delete/<fname>', methods=['POST'])
@@ -198,41 +261,71 @@ def deletefn(fname):
     return {'success': True}
 
 
+@app.route('/last_message/<topic>')
+def last_message(topic):
+#    return {'disk_gauge': 0.11078185225812925, 'title_text': ': received SIGUSR1 (code 19) at main.c(1465) [receiver=3.1.3]', 'file_gauge': 0.28, 'file_size_text': 3940.0, 'file_time_text': '0:19:14'}
+    if topic[0] == ':':
+        topic = topic[1:]
+
+    consumer = kafka.KafkaConsumer(bootstrap_servers=[ os.environ['KAFKA_ADDRESS'] ], group_id="webide_"+topic)
+    topic_partition = kafka.TopicPartition(topic, 0)
+    consumer.assign([topic_partition])
+    consumer.seek_to_end(topic_partition)
+    lastpos = consumer.position(topic_partition) - 1
+    consumer.seek(topic_partition, lastpos)
+    val = next(consumer).value
+    consumer.close()
+    return json.loads(val.decode())
+
+
+@app.route('/write_topic/<topic>', methods=['POST'])
+def write_topic(topic):
+    producer = kafka.KafkaProducer(bootstrap_servers=[ os.environ['KAFKA_ADDRESS'] ])
+    producer.send(topic, request.data)
+    return jsonify({"success": True})
+
+
 @app.route('/stdout/<fnname>')
 def stdout(fnname):
     #return {"stdouts":[{"stdout":"asdf\n","tstamp":1687981427.897007},{"stdout":"asdf\n","tstamp":1687981427.897456},{"stdout":"asdf\n","tstamp":1687981427.897657},{"stdout":"asdf\n","tstamp":1687981427.897852},{"stdout":"asdf\n","tstamp":1687981427.898045},{"stdout":"asdf\n","tstamp":1687981432.913297},{"stdout":"asdf\n","tstamp":1687981432.913751},{"stdout":"asdf\n","tstamp":1687981432.913994},{"stdout":"asdf\n","tstamp":1687981432.91423},{"stdout":"asdf\n","tstamp":1687981432.91447},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.919217},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.919816},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.921217},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.922535},{"stdout":"Traceback (most recent call last):\n  File \"/home/app/gowalla.py\", line 152, in <module>\n    ret = function(rec, **application['params'])\n  File \"<string>\", line 4, in add_field\nException: its exceptin\n\n","tstamp":1687981437.926271}]}
     if fnname.startswith('process:'):
       return ''
 
-    topic = fnname + '_stdout'
+    minutes_arg = int(request.args.get('minutes', 10))
+
+    if fnname.startswith(':'):
+        topic = fnname[1:]
+    else:
+        topic = fnname + '_stdout'
     
-    consumer = kafka.KafkaConsumer(bootstrap_servers=[ os.environ['KAFKA_ADDRESS'] ])
+    consumer = kafka.KafkaConsumer(bootstrap_servers=[ os.environ['KAFKA_ADDRESS'] ], group_id="webide_"+topic)
     
-    dtstmp = datetime.datetime.now()-datetime.timedelta(minutes=10)
-    
-    month_ago = dtstmp.timestamp()
+    time_offset = (datetime.datetime.now() - relativedelta(minutes=minutes_arg)).timestamp()
     topic_partition = kafka.TopicPartition(topic, 0)
     assigned_topic = [topic_partition]
     consumer.assign(assigned_topic)
-    
+
     partitions = consumer.assignment()
-    partition_to_timestamp = {part: int(month_ago * 1000) for part in partitions}
+    partition_to_timestamp = {part: int(time_offset) for part in partitions}
     end_offsets = consumer.end_offsets(list(partition_to_timestamp.keys()))
-    
-    mapping = consumer.offsets_for_times(partition_to_timestamp)
+
     msgs = []
+    mapping = consumer.offsets_for_times(partition_to_timestamp)
     for partition, ts in mapping.items():
-        if not ts:
-           continue
+        if ts is None: 
+            continue
         end_offset = end_offsets.get(partition)
         consumer.seek(partition, ts[0])
         for msg in consumer:
-            value = json.loads(msg.value.decode('utf-8'))
-            msgs.append(value)
+            try:
+                value = json.loads(msg.value.decode('utf-8'))
+                msgs.append(value)
+            except:
+                pass
             if msg.offset == end_offset - 1:
-                consumer.close()
                 break
-    
+        consumer.close()
+
     return { "stdouts": msgs[-1:-50:-1] }
 
 
@@ -249,7 +342,9 @@ def fn_map_svg():
 
     data = [ "digraph a {", "bgcolor=transparent" ]
     for fname, apps in mappings.items():
+      fname = fname.strip()
       for from_topic, mapps in apps.items():
+        from_topic = from_topic.strip()
         for mapp in mapps:
           params = []
           for k,v in mapp['params'].items():
@@ -259,7 +354,7 @@ def fn_map_svg():
             else:
               params.append(f"{k}={v}")
               #params.append(f"{v}")
-          params = "\n".join(params)
+          params = "\n".join(params).replace('"', "'")
 
           for out in mapp['outputs']:
             if 'default' in out:
